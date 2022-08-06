@@ -29,12 +29,15 @@ migrate = Migrate(app, db)
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
-shows = db.Table('Shows', 
-    db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
-    db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
-    db.Column('start_time', db.DateTime))
+class Show(db.Model):
+  __tablename__ = "Show"
+  venue_id= db.Column(db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
+  artist_id= db.Column(db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
+  start_time= db.Column(db.DateTime, nullable=False)
+  artist = db.relationship("Artist", back_populates="venues")
+  venue = db.relationship("Venue", back_populates="artists")
 class Venue(db.Model):
-    __tablename__ = 'Venue'
+    __tablename__ = "Venue"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
@@ -48,31 +51,25 @@ class Venue(db.Model):
     website_link = db.Column(db.String(120))
     looking_for_talent = db.Column(db.Boolean)
     seeking_description = db.Column(db.String())
-    artists = db.relationship('Artist', secondary = shows, backref=db.backref('shows', lazy=True))
+    artists = db.relationship("Show", back_populates="venue")
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 class Artist(db.Model):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
+    name = db.Column(db.String,  nullable=False)
+    city = db.Column(db.String(120), nullable=False )
+    state = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(120), nullable=False)
+    genres = db.Column(db.String(120), nullable=False)
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     website_link = db.Column(db.String(120))
     looking_for_venues = db.Column(db.Boolean)
     seeking_description = db.Column(db.String())
+    venues = db.relationship("Show", back_populates="artist")
     
-
-    
-
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
-
-# TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -246,6 +243,7 @@ def create_venue_submission():
       state = venueform.state.data,
       address = venueform.address.data,
       phone = venueform.phone.data,
+      genres = venueform.genres.data,
       image_link = venueform.image_link.data,
       facebook_link = venueform.facebook_link.data,
       website_link = venueform.website_link.data,
@@ -537,15 +535,34 @@ def create_shows():
 
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
+  showform = ShowForm()
+  error = False
+  try: 
+    venue = Venue.query.filter_by(id=showform.venue_id.data).first()
+    venue.artists.append(Show(artist_id=showform.artist_id.data, start_time = showform.start_time.data))
+    db.session.commit()
+  except:
+    error = True
+    db.session.rollback()
+    print(sys.exc_info()) 
+  finally: 
+    db.session.close()
+    if error:
+      flash('An error occurred. Show could not be listed.')
+    else: 
+      flash('Show was successfully listed!')
+    return render_template('pages/home.html')
+
+
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
 
   # on successful db insert, flash success
-  flash('Show was successfully listed!')
+  
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+  
 
 @app.errorhandler(404)
 def not_found_error(error):
