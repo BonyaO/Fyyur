@@ -78,6 +78,8 @@
 <a href="/venues/{{ venue.id }}/edit"><button class="btn btn-primary btn-lg">Edit</button></a>
 <button class="btn btn-primary btn-lg" id="delete-btn" data-id="{{ venue.id }}">Delete</button>
 <script>
+	// Script to delete a venue item. At moment, it deletes successfully and redirects to the index directly.
+	//At the momment, I am unable to handle displaying feedback whether the deletion was successful or not.
 	btn = document.getElementById('delete-btn')
 	btn.onclick = function(e){
 		const venue = e.target.dataset['id'];
@@ -85,8 +87,9 @@
                 method: 'DELETE'
               })
 			  .then( () => {
-				window.location.href = "/pages/home.html"
+				window.location.href = "/"
 			  })
+			
 
 	}
 	

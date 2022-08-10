@@ -190,7 +190,9 @@ def create_venue_submission():
       flash('Venue ' + request.form['name'] + ' was successfully listed!')
     return render_template('pages/home.html')
   
-
+# Route to delete a venue Item
+# At the moment feedback on success or failure can't be displayed even though I use flash()
+# I guess it's because of my little understand of how the ajax requests communicates and responds to this route.
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
   error = False
@@ -203,11 +205,10 @@ def delete_venue(venue_id):
     print(sys.exc_info())
   finally:
     db.session.close()
-    
-  if error: 
-    flash('An error occurred. Venue ID: ' + venue_id + ' could not be be deleted.')
-  else: 
-    flash('Venue with ID: ' + venue_id + ' was successfully deleted!')
+    if not error: 
+      flash('Venue with ID: ' + venue_id + ' was successfully deleted!')
+    else: 
+      flash('An error occurred. Venue ID: ' + venue_id + ' could not be be deleted.')
   return render_template('pages/home.html')
   
 
@@ -223,7 +224,6 @@ def search_artists():
   search_term = request.form['search_term']
 
   artists = Artist.query.filter(func.lower(Artist.name).contains(search_term.lower())).all()
-  
   
   artist_data = []
   for artist in artists:
@@ -404,7 +404,6 @@ def create_artist_submission():
       flash('Artist ' + request.form['name'] + ' was successfully listed!')
     return render_template('pages/home.html')
 
-  # TODO: modify data to be the data object returned from db insertion
 
 
 #  Shows
@@ -435,12 +434,20 @@ def create_shows():
   form = ShowForm()
   return render_template('forms/new_show.html', form=form)
 
+
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
   showform = ShowForm()
   error = False
+  # I was forced to devise a way to enter the id for shows as the id could not autoincrement eventhough I set the id Column similar to the other models
+  # But I still get a NotNullViolation when I try to create a show with Show(artist_id, venue_id, start_time)
+  # So I use some logic to combine artist_id, venue_id and time that will be unique for each show
+  # Basically, show id = artist_id + venue_id + hour of start_time
+  hour = showform.start_time.data.hour
+  show_id = int(showform.artist_id.data) + int(showform.venue_id.data) + hour
   try: 
-    show = Show(artist_id=showform.artist_id.data, venue_id=showform.venue_id.data, start_time = showform.start_time.data)
+
+    show = Show(id=show_id, artist_id=showform.artist_id.data, venue_id=showform.venue_id.data, start_time = showform.start_time.data)
     db.session.add(show)
     db.session.commit()
   except:

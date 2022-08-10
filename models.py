@@ -12,11 +12,17 @@ db = SQLAlchemy(app)
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
+
+# Show Model (Association table for the many to many relationship)
+# The need for a separate id column for shows only come because if we use the venue_id and the artist_id as the primary keys,
+# it will restrict one artist to have only one show at a particular venue. trying to add a show at a different time for the same
+# artist at the same venue will cause an error.
 class Show(db.Model):
   __tablename__ = "Show"
-  venue_id= db.Column(db.Integer, db.ForeignKey('Venue.id', ondelete="CASCADE"), primary_key=True)
-  artist_id= db.Column(db.Integer, db.ForeignKey('Artist.id', ondelete="CASCADE"), primary_key=True)
-  start_time= db.Column(db.DateTime, primary_key=True)
+  id = db.Column(db.Integer, primary_key=True)
+  venue_id= db.Column(db.Integer, db.ForeignKey('Venue.id', ondelete="CASCADE"), nullable=False)
+  artist_id= db.Column(db.Integer, db.ForeignKey('Artist.id', ondelete="CASCADE"), nullable=False)
+  start_time= db.Column(db.DateTime, nullable=False)
   
 class Venue(db.Model):
     __tablename__ = "Venue"
