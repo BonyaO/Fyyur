@@ -1,12 +1,6 @@
-
-from flask import Flask
-from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 
-app = Flask(__name__)
-db = SQLAlchemy(app)
-
+db = SQLAlchemy()
 
 
 #----------------------------------------------------------------------------#
@@ -34,12 +28,12 @@ class Venue(db.Model):
     address = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(120), nullable=False)
     image_link = db.Column(db.String(500))
-    genres = db.Column(db.String(), nullable=False)
+    genres = db.Column(db.ARRAY(db.String), nullable=False)
     facebook_link = db.Column(db.String(120))
     website_link = db.Column(db.String(120))
     seeking_talent = db.Column(db.Boolean)
     seeking_description = db.Column(db.String())
-    shows = db.relationship("Show", backref="venue", cascade="all, delete", lazy=True)
+    shows = db.relationship("Show", backref="venue", cascade="all, delete", lazy='joined')
 
 
 class Artist(db.Model):
@@ -50,10 +44,10 @@ class Artist(db.Model):
     city = db.Column(db.String(120), nullable=False )
     state = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(120), nullable=False)
-    genres = db.Column(db.String(120), nullable=False)
+    genres = db.Column(db.ARRAY(db.String), nullable=False)
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     website_link = db.Column(db.String(120))
     seeking_venues = db.Column(db.Boolean)
     seeking_description = db.Column(db.String())
-    shows = db.relationship("Show", backref="artist", cascade="all, delete", lazy=True)
+    shows = db.relationship("Show", backref="artist", cascade="all, delete", lazy='joined')

@@ -2,13 +2,16 @@
 # Imports
 #----------------------------------------------------------------------------#
 
-import json
-from lib2to3.pgen2.pgen import DFAState
 import sys
 from this import d
 import dateutil.parser
 import babel
-from flask import Flask, render_template, request, Response, flash, redirect, url_for
+from flask import (Flask, 
+    render_template, 
+    request,
+    flash, 
+    redirect, 
+    url_for)
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
@@ -18,13 +21,15 @@ from forms import *
 from flask_migrate import Migrate
 from datetime import datetime
 from sqlalchemy import func
-from models import *
+from models import db, Venue, Artist, Show
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
 
+app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
+db.init_app(app)
 migrate = Migrate(app, db)
 
 
@@ -56,56 +61,43 @@ def index():
 
 @app.route('/venues')
 def venues():
-  
-  venues = Venue.query.group_by(Venue.id, Venue.state, Venue.city).all()
-  data = []
-  venue_city_and_state = ''
 
-  for venue in venues: 
-    num_upcoming_shows = Show.query.filter(venue.id == Show.venue_id).filter(Show.start_time > datetime.now()).count()
-    if venue_city_and_state == venue.city + venue.state:
-      data[len(data) - 1]["venues"].append({
-        "id": venue.id,
-        "name": venue.name,
-        "num_upcoming_shows": num_upcoming_shows
-      })
-    else: 
-      venue_city_and_state == venue.city + venue.state
-      data.append({
-        "city": venue.city,
-        "state": venue.state,
-        "venues": [{
-          "id": venue.id,
-          "name": venue.name,
-          "num_upcoming_shows": num_upcoming_shows,
-        }]
-      })
+  locals = []
+  venues = Venue.query.all()
 
+  places = Venue.query.distinct(Venue.city, Venue.state).all()
 
-  return render_template('pages/venues.html', areas=data)
+  for place in places:
+    locals.append({
+      'city':place.city,
+      'state':place.state,
+      'venues':[{
+        'id': venue.id,
+        'name':venue.name,
+        'num_coming_shows': len(([show for show in venue.shows if show.start_time > datetime.now()]))
+      } for venue in venues if 
+          venue.city == place.city and venue.state == place.state
+      ]
+    })
+
+  return render_template('pages/venues.html', areas=locals)
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
 
-  search_term = request.form['search_term'].casefold()
-  venues = Venue.query.filter(func.lower(Venue.name).contains(search_term.lower())).all()
+  search_term = request.form.get('search_term', '')
+  venues = Venue.query.filter(Venue.name.ilike("%" + search_term + "%")).all()
 
-  venue_data = []
+  response = {
+    "count": len(venues),
+    "data": []
+  }
 
   for venue in venues:
-    num_upcoming_shows = Show.query.filter(venue.id == Show.venue_id).filter(Show.start_time > datetime.now()).count()
-    venue_info = {
-      "id": venue.id,
-      "name": venue.name,
-      "num_upcoming_shows": num_upcoming_shows
-    }
-    venue_data.append(venue_info)
-
-
-  response={
-    "count": len(venue_data),
-    "data": venue_data
-  }
+      response["data"].append({
+          'id': venue.id,
+          'name': venue.name,
+      })
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
 @app.route('/venues/<int:venue_id>')
@@ -113,37 +105,25 @@ def show_venue(venue_id):
   # shows the venue page with the given venue_id
   past_shows = []
   upcoming_shows = []
-  venue = Venue.query.get(venue_id)
+  venue = Venue.query.get_or_404(venue_id)
   shows = venue.shows
   for show in shows:
-    show_info = {
+    temp_show = {
       "artist_id": show.venue_id,
       "artist_name": show.artist.name,
       "artist_image_link": show.artist.image_link,
-      "start_time": str(show.start_time)
+      "start_time": show.start_time.strftime("%m/%d/%Y, %H:%M")
     }
-    if (show.start_time < datetime.now()):
-      past_shows.append(show_info)
+    if (show.start_time <= datetime.now()):
+      past_shows.append(temp_show)
     else: 
-      upcoming_shows.append(show_info)
-  data ={
-    "id": venue.id,
-    "name": venue.name,
-    "genres": venue.genres.split(','),
-    "address": venue.address,
-    "city": venue.city,
-    "state": venue.state,
-    "phone": venue.phone,
-    "website": venue.website_link,
-    "facebook_link": venue.facebook_link,
-    "seeking_talent": venue.seeking_talent,
-    "seeking_description": venue.seeking_description,
-    "image_link": venue.image_link,
-    "past_shows": past_shows,
-    "upcoming_shows": upcoming_shows,
-    "past_shows_count": len(past_shows),
-    "upcoming_shows_count": len(upcoming_shows),
-  }
+      upcoming_shows.append(temp_show)
+  data = vars(venue)
+  
+  data['past_shows'] = past_shows
+  data['upcoming_shows']=upcoming_shows
+  data['past_shows_count'] = len(past_shows)
+  data['upcoming_shows_count'] = len(upcoming_shows)
   
   return render_template('pages/show_venue.html', venue=data)
 
@@ -159,7 +139,7 @@ def create_venue_form():
 def create_venue_submission():
   error=False
   data={}
-  venueform = VenueForm()
+  venueform = VenueForm(request.form)
   try:
     venue = Venue(
       name = venueform.name.data,
@@ -255,33 +235,22 @@ def show_artist(artist_id):
   artist = Artist.query.get(artist_id)
   shows = artist.shows
   for show in shows:
-    show_info = {
+    temp_show = {
       "venue_id": show.venue_id,
       "venue_name": show.venue.name,
       "venue_image_link": show.venue.image_link,
       "start_time": str(show.start_time)
     }
     if (show.start_time < datetime.now()):
-      past_shows.append(show_info)
+      past_shows.append(temp_show)
     else: 
-      upcoming_shows.append(show_info)
-  data={
-    "id": artist.id,
-    "name": artist.name,
-    "genres": artist.genres.split(','),
-    "city": artist.city,
-    "state": artist.state,
-    "phone": artist.phone,
-    "website": artist.website_link,
-    "facebook_link": artist.facebook_link,
-    "seeking_venue": artist.seeking_venues,
-    "seeking_description": artist.seeking_description,
-    "image_link": artist.image_link,
-    "past_shows": past_shows,
-    "upcoming_shows": upcoming_shows,
-    "past_shows_count": len(past_shows),
-    "upcoming_shows_count": len(upcoming_shows),
-  }
+      upcoming_shows.append(temp_show)
+  data = vars(artist)
+
+  data['past_shows']=past_shows
+  data['upcoming_shows']=upcoming_shows
+  data['past_shows_count']=len(past_shows)
+  data['upcoming_shows_count']=len(upcoming_shows)
 
   return render_template('pages/show_artist.html', artist=data)
 
@@ -303,7 +272,7 @@ def edit_artist(artist_id):
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
 def edit_artist_submission(artist_id):
-  form = ArtistForm()
+  form = ArtistForm(request.form)
   try: 
     artist = Artist.query.filter_by(id=artist_id).first()
     artist.name=form.name.data,
@@ -342,7 +311,7 @@ def edit_venue(venue_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
-  venueform = VenueForm()
+  venueform = VenueForm(request.form)
   try: 
     venue = Venue.query.filter_by(id=venue_id).first()
     venue.name = venueform.name.data,
@@ -376,7 +345,7 @@ def create_artist_form():
 def create_artist_submission():
   data={}
   error = False
-  form = ArtistForm()
+  form = ArtistForm(request.form)
   try: 
     artist = Artist(
       name=form.name.data,
@@ -437,17 +406,20 @@ def create_shows():
 
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
-  showform = ShowForm()
+  showform = ShowForm(request.form)
   error = False
-  # I was forced to devise a way to enter the id for shows as the id could not autoincrement eventhough I set the id Column similar to the other models
-  # But I still get a NotNullViolation when I try to create a show with Show(artist_id, venue_id, start_time)
-  # So I use some logic to combine artist_id, venue_id and time that will be unique for each show
-  # Basically, show id = artist_id + venue_id + hour of start_time
-  hour = showform.start_time.data.hour
-  show_id = int(showform.artist_id.data) + int(showform.venue_id.data) + hour
+  # # I was forced to devise a way to enter the id for shows as the id could not autoincrement eventhough I set the id Column similar to the other models
+  # # But I still get a NotNullViolation when I try to create a show with Show(artist_id, venue_id, start_time)
+  # # So I use some logic to combine artist_id, venue_id and time that will be unique for each show
+  # # Basically, show id = artist_id + venue_id + hour of start_time
+  # hour = showform.start_time.data.hour
+  # show_id = int(showform.artist_id.data) + int(showform.venue_id.data) + hour
   try: 
 
-    show = Show(id=show_id, artist_id=showform.artist_id.data, venue_id=showform.venue_id.data, start_time = showform.start_time.data)
+    show = Show(
+      artist_id=showform.artist_id.data, 
+      venue_id=showform.venue_id.data, 
+      start_time = showform.start_time.data)
     db.session.add(show)
     db.session.commit()
   except:

@@ -9,5 +9,7 @@ DEBUG = True
 # Connect to the database
 
 
-# TODO IMPLEMENT DATABASE URL
+# DATABASE URL
 SQLALCHEMY_DATABASE_URI = 'postgresql://bonya:Weblife22@localhost:5432/fyyurdb'
+# Disable modifications tracking
+SQLALCHEMY_TRACK_MODIFICATIONS = False
