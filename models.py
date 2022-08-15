@@ -13,6 +13,7 @@ db = SQLAlchemy()
 # artist at the same venue will cause an error.
 class Show(db.Model):
   __tablename__ = "Show"
+  
   id = db.Column(db.Integer, primary_key=True)
   venue_id= db.Column(db.Integer, db.ForeignKey('Venue.id', ondelete="CASCADE"), nullable=False)
   artist_id= db.Column(db.Integer, db.ForeignKey('Artist.id', ondelete="CASCADE"), nullable=False)

@@ -119,7 +119,7 @@ def show_venue(venue_id):
     else: 
       upcoming_shows.append(temp_show)
   data = vars(venue)
-  
+ 
   data['past_shows'] = past_shows
   data['upcoming_shows']=upcoming_shows
   data['past_shows_count'] = len(past_shows)
@@ -138,7 +138,6 @@ def create_venue_form():
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
   error=False
-  data={}
   venueform = VenueForm(request.form)
   try:
     venue = Venue(
@@ -156,7 +155,6 @@ def create_venue_submission():
     )
     db.session.add(venue)
     db.session.commit()
-    data['name'] = venue.name
   except: 
     error = True
     db.session.rollback()
@@ -245,12 +243,13 @@ def show_artist(artist_id):
       past_shows.append(temp_show)
     else: 
       upcoming_shows.append(temp_show)
-  data = vars(artist)
 
+  data = vars(artist)
   data['past_shows']=past_shows
   data['upcoming_shows']=upcoming_shows
   data['past_shows_count']=len(past_shows)
   data['upcoming_shows_count']=len(upcoming_shows)
+  
 
   return render_template('pages/show_artist.html', artist=data)
 
@@ -294,15 +293,12 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-  error = False
   try: 
     venue = Venue.query.filter_by(id=venue_id).first()
     form = VenueForm(obj=venue)
     form.populate_obj(venue)
     db.session.commit()
   except: 
-    error = True
-    print(sys.exc_info())
     db.sesssion.rollback()
 
   finally:
@@ -312,6 +308,7 @@ def edit_venue(venue_id):
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
   venueform = VenueForm(request.form)
+  error = False
   try: 
     venue = Venue.query.filter_by(id=venue_id).first()
     venue.name = venueform.name.data,
@@ -328,6 +325,7 @@ def edit_venue_submission(venue_id):
     db.session.commit()
 
   except:
+    error = True
     db.session.rollback() 
   finally:
     db.session.close()
@@ -361,6 +359,7 @@ def create_artist_submission():
     )
     db.session.add(artist)
     db.session.commit()
+
   except:
     error = True
     db.session.rollback 
@@ -408,18 +407,13 @@ def create_shows():
 def create_show_submission():
   showform = ShowForm(request.form)
   error = False
-  # # I was forced to devise a way to enter the id for shows as the id could not autoincrement eventhough I set the id Column similar to the other models
-  # # But I still get a NotNullViolation when I try to create a show with Show(artist_id, venue_id, start_time)
-  # # So I use some logic to combine artist_id, venue_id and time that will be unique for each show
-  # # Basically, show id = artist_id + venue_id + hour of start_time
-  # hour = showform.start_time.data.hour
-  # show_id = int(showform.artist_id.data) + int(showform.venue_id.data) + hour
   try: 
 
-    show = Show(
-      artist_id=showform.artist_id.data, 
-      venue_id=showform.venue_id.data, 
-      start_time = showform.start_time.data)
+    venue = Venue.query.get(showform.venue_id.data)
+    show = Show(start_time=showform.start_time.data)
+    show.artist = Artist.query.get(showform.artist_id.data)
+    venue.shows.append(show)
+    
     db.session.add(show)
     db.session.commit()
   except:
